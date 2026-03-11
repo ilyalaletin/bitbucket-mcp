@@ -16,7 +16,7 @@ Environment variables:
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `list_prs` | List PRs with filters. Uses `/rest/api/1.0/dashboard/pull-requests` for role-based filtering | `project`, `repo` (optional when using role filter), `state` (OPEN/MERGED/DECLINED/ALL), `role` (AUTHOR/REVIEWER, optional) |
+| `list_prs` | List PRs with filters. Routing: if `role` is set, uses dashboard endpoint (project/repo ignored). Otherwise `project` and `repo` are required and the repo-scoped endpoint is used. | `project` (optional), `repo` (optional), `state` (OPEN/MERGED/DECLINED/ALL), `role` (AUTHOR/REVIEWER, optional), `limit` (default 25, max 100) |
 | `get_pr` | PR details: description, author, reviewers, status | `project`, `repo`, `pr_id` |
 | `get_pr_diff` | Full PR diff | `project`, `repo`, `pr_id` |
 | `get_pr_commits` | List commits in a PR | `project`, `repo`, `pr_id` |
@@ -33,7 +33,14 @@ Environment variables:
 |------|-------------|------------|
 | `list_files` | List files/directories in a repo | `project`, `repo`, `path` (optional), `ref` (branch/commit, optional) |
 | `get_file_content` | Read file content | `project`, `repo`, `path`, `ref` (optional) |
-| `get_diff` | Diff between two refs | `project`, `repo`, `from`, `to`, `path` (optional, scope to single file) |
+| `get_diff` | Diff between two refs via compare endpoint | `project`, `repo`, `from`, `to`, `path` (optional, scope to single file) |
+
+## Design Notes
+
+- **Output format:** All tools return JSON-serialized results as MCP text content. No MCP resources or prompts are defined — tools only.
+- **`list_files` vs `get_file_content`:** Both use the `/browse/{path}` endpoint. Bitbucket returns different response shapes for directories vs files (presence of `children` vs `lines`). The client method inspects the response to return the appropriate type.
+- **`ref` parameter:** Accepts branches, tags, or commit hashes. When omitted, defaults to the repository's default branch (Bitbucket Server default behavior).
+- **`list_prs` routing:** When `role` is provided, the dashboard endpoint is used and `project`/`repo` are ignored. When `role` is omitted, `project` and `repo` are required and the repo-scoped endpoint is used.
 
 ## Architecture
 
@@ -61,7 +68,7 @@ type Client struct {
 ```
 
 - All methods return `(result, error)`
-- Pagination handled internally (Bitbucket Server uses `isLastPage` + `nextPageStart`) — methods return complete results
+- Pagination handled internally (Bitbucket Server uses `isLastPage` + `nextPageStart`). Methods accept a `limit` parameter to cap results (default 25, max 100) to prevent unbounded responses
 - API errors wrapped with status code and response body
 - Retry: up to 3 attempts with exponential backoff (1s, 2s, 4s) on recoverable errors (429, 5xx, network timeouts). No retry on 4xx (except 429).
 
@@ -87,4 +94,4 @@ type Client struct {
 - `GET /rest/api/1.0/projects/{project}/repos/{repo}/pull-requests/{prId}/commits` — PR commits
 - `GET /rest/build-status/1.0/commits/{commitId}` — build statuses
 - `GET /rest/api/1.0/projects/{project}/repos/{repo}/browse/{path}?at={ref}` — file listing / content
-- `GET /rest/api/1.0/projects/{project}/repos/{repo}/diff/{path}?from={from}&to={to}` — diff between refs
+- `GET /rest/api/1.0/projects/{project}/repos/{repo}/compare/diff?from={from}&to={to}` — diff between refs (path filter via `?path={path}`)
