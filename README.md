@@ -16,17 +16,39 @@ MCP (Model Context Protocol) server providing access to Bitbucket Server / Data 
 
 ## Installation
 
-### 1. Build from source
+### Option 1: Using go install (recommended)
+
+```bash
+go install github.com/ilyalaletin/bitbucket-mcp/cmd/bitbucket-mcp@latest
+```
+
+Or a specific version:
+```bash
+go install github.com/ilyalaletin/bitbucket-mcp/cmd/bitbucket-mcp@v0.1
+```
+
+### Option 2: Download binary
+
+Download from [releases](https://github.com/ilyalaletin/bitbucket-mcp/releases):
+- Linux: `bitbucket-mcp-linux-amd64` or `bitbucket-mcp-linux-arm64`
+- macOS: `bitbucket-mcp-darwin-amd64` or `bitbucket-mcp-darwin-arm64`
+
+```bash
+# Extract and move to PATH
+chmod +x bitbucket-mcp-*
+mv bitbucket-mcp-* /usr/local/bin/bitbucket-mcp
+```
+
+### Option 3: Build from source
 
 ```bash
 git clone https://github.com/ilyalaletin/bitbucket-mcp.git
 cd bitbucket-mcp
 go build ./cmd/bitbucket-mcp/
+mv bitbucket-mcp /usr/local/bin/  # optional
 ```
 
-Or download a binary from [releases](https://github.com/ilyalaletin/bitbucket-mcp/releases).
-
-### 2. Run the install wizard
+### Configure with install wizard
 
 ```bash
 ./bitbucket-mcp --install
@@ -40,7 +62,7 @@ The wizard will:
 3. Guide you to generate a Personal Access Token
 4. Validate credentials and save config
 
-### 3. Manual setup (if wizard doesn't detect your agent)
+### Manual setup (if wizard doesn't detect your agent)
 
 Add to your agent's MCP config:
 
@@ -74,13 +96,7 @@ Add to your agent's MCP config:
 }
 ```
 
-Make sure the binary is on your `$PATH`:
-```bash
-# Copy to /usr/local/bin or another PATH directory
-cp bitbucket-mcp /usr/local/bin/
-```
-
-### 4. Restart your agent
+### Restart your agent
 
 Restart Claude Code or Cursor to activate the MCP server.
 
