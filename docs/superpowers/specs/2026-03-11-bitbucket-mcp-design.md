@@ -40,7 +40,10 @@ Environment variables:
 - **Output format:** All tools return JSON-serialized results as MCP text content. No MCP resources or prompts are defined — tools only.
 - **`list_files` vs `get_file_content`:** Both use the `/browse/{path}` endpoint. Bitbucket returns different response shapes for directories vs files (presence of `children` vs `lines`). The client method inspects the response to return the appropriate type.
 - **`ref` parameter:** Accepts branches, tags, or commit hashes. When omitted, defaults to the repository's default branch (Bitbucket Server default behavior).
-- **`list_prs` routing:** When `role` is provided, the dashboard endpoint is used and `project`/`repo` are ignored. When `role` is omitted, `project` and `repo` are required and the repo-scoped endpoint is used.
+- **`list_prs` routing:** When `role` is provided, the dashboard endpoint is used and `project`/`repo` are ignored. When `role` is omitted, `project` and `repo` are required — return a validation error if they are missing. `state` defaults to `OPEN` when omitted.
+- **`get_diff` `from`/`to` parameters:** Accept branch names, tags, or commit hashes (same as `ref`).
+- **Diff size:** `get_pr_diff` and `get_diff` return diffs as-is from the API. If the diff exceeds 1MB, truncate and append a notice. This prevents MCP response bloat.
+- **Binary files:** `get_file_content` returns a message indicating the file is binary instead of attempting to return binary content. Bitbucket's browse endpoint includes a `binary` flag in the response metadata.
 
 ## Architecture
 
