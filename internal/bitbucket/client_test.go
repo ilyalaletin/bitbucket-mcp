@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -165,5 +166,45 @@ func TestGetJSON_APIError(t *testing.T) {
 	}
 	if apiErr.StatusCode != 404 {
 		t.Errorf("expected status 404, got %d", apiErr.StatusCode)
+	}
+}
+
+func TestGetRaw_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("raw content here"))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "token")
+	data, err := client.getRaw(context.Background(), "/test", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(data) != "raw content here" {
+		t.Errorf("expected 'raw content here', got %q", string(data))
+	}
+}
+
+func TestGetRaw_Truncation(t *testing.T) {
+	// Create content larger than 1MB
+	bigContent := make([]byte, 1024*1024+100)
+	for i := range bigContent {
+		bigContent[i] = 'x'
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(bigContent)
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "token")
+	data, err := client.getRaw(context.Background(), "/test", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(data) > 1024*1024+200 {
+		t.Errorf("expected truncated content, got %d bytes", len(data))
+	}
+	if !strings.Contains(string(data), "[truncated") {
+		t.Error("expected truncation notice")
 	}
 }
