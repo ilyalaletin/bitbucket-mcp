@@ -7,12 +7,18 @@ import (
 	"os"
 
 	"github.com/ilyalaletin/bitbucket-mcp/internal/bitbucket"
+	"github.com/ilyalaletin/bitbucket-mcp/internal/install"
 	"github.com/ilyalaletin/bitbucket-mcp/internal/tools"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 func main() {
+	// Check for --install or -i flag
+	if len(os.Args) > 1 && (os.Args[1] == "--install" || os.Args[1] == "-i") {
+		os.Exit(install.Run(os.Stdin, os.Stdout))
+	}
+
 	// Read environment variables
 	bitbucketURL := os.Getenv("BITBUCKET_URL")
 	bitbucketToken := os.Getenv("BITBUCKET_TOKEN")
