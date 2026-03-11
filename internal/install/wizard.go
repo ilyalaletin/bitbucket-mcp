@@ -151,7 +151,7 @@ func Run(in io.Reader, out io.Writer) int {
 
 	// Step 8: Validation
 	if err := validateCredentialsFn(url, token); err != nil {
-		printf("Error: validation failed (HTTP %v)\n", extractStatus(err))
+		printf("Error: validation failed (%v)\n", err)
 		return 1
 	}
 
@@ -185,9 +185,4 @@ func Run(in io.Reader, out io.Writer) int {
 	printf("\nRestart Claude Code / Cursor to activate the bitbucket-mcp server.\n")
 
 	return 0
-}
-
-// extractStatus extracts the HTTP status from a validation error.
-func extractStatus(err error) string {
-	return err.Error() // Already formatted as "HTTP NNN" from ValidateCredentials
 }
