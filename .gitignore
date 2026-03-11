@@ -8,6 +8,9 @@
 *.so
 *.dylib
 
+# Project binary (in root only)
+/bitbucket-mcp
+
 # Test binary, built with `go test -c`
 *.test
 
