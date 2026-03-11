@@ -2,6 +2,7 @@ package bitbucket
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -119,5 +120,50 @@ func TestDo_Retry_On429(t *testing.T) {
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestGetJSON_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"name": "test"}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "token")
+
+	var result struct {
+		Name string `json:"name"`
+	}
+	err := client.getJSON(context.Background(), "/test", nil, &result)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Name != "test" {
+		t.Errorf("expected name 'test', got %q", result.Name)
+	}
+}
+
+func TestGetJSON_APIError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"errors": [{"message": "not found"}]}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "token")
+
+	var result map[string]any
+	err := client.getJSON(context.Background(), "/test", nil, &result)
+	if err == nil {
+		t.Fatal("expected error for 404 response")
+	}
+
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("expected APIError, got %T: %v", err, err)
+	}
+	if apiErr.StatusCode != 404 {
+		t.Errorf("expected status 404, got %d", apiErr.StatusCode)
 	}
 }

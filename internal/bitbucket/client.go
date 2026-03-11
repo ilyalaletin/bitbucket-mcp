@@ -2,6 +2,7 @@ package bitbucket
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -72,4 +73,40 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values) 
 		return lastResp, nil
 	}
 	return nil, fmt.Errorf("request failed after 3 attempts: %w", lastErr)
+}
+
+type APIError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("bitbucket API error (status %d): %s", e.StatusCode, e.Body)
+}
+
+func (c *Client) getJSON(ctx context.Context, path string, query url.Values, result any) error {
+	resp, err := c.do(ctx, "GET", path, query)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("reading response body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return &APIError{
+			StatusCode: resp.StatusCode,
+			Body:       string(body),
+		}
+	}
+
+	if result != nil {
+		if err := json.Unmarshal(body, result); err != nil {
+			return fmt.Errorf("decoding response: %w", err)
+		}
+	}
+	return nil
 }
