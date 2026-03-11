@@ -31,7 +31,7 @@ func ValidateCredentials(baseURL, token string) error {
 	defer resp.Body.Close()
 
 	// Discard response body
-	io.ReadAll(resp.Body)
+	_, _ = io.ReadAll(resp.Body)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("HTTP %d", resp.StatusCode)
