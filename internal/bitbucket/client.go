@@ -113,6 +113,158 @@ func (c *Client) getJSON(ctx context.Context, path string, query url.Values, res
 	return nil
 }
 
+// ListPRsOptions specifies filters for listing pull requests
+type ListPRsOptions struct {
+	Project string // project key (required if Role is empty)
+	Repo    string // repository slug (required if Role is empty)
+	State   string // OPEN, MERGED, DECLINED, or ALL (defaults to OPEN)
+	Role    string // AUTHOR or REVIEWER (optional; if set, uses dashboard endpoint)
+	Limit   int    // max results per page (default 25, max 100)
+}
+
+// paginate is a generic helper that handles multi-page pagination.
+// It fetches pages until isLastPage is true, accumulating results up to limit total items.
+func paginate[T any](ctx context.Context, c *Client, path string, query url.Values, limit int) ([]T, error) {
+	if limit == 0 {
+		limit = 25
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	var allResults []T
+	start := 0
+
+	for {
+		// Set pagination params
+		q := url.Values{}
+		if query != nil {
+			q = query
+		}
+		q.Set("start", fmt.Sprintf("%d", start))
+		q.Set("limit", fmt.Sprintf("%d", limit))
+
+		var resp PagedResponse[T]
+		if err := c.getJSON(ctx, path, q, &resp); err != nil {
+			return nil, err
+		}
+
+		allResults = append(allResults, resp.Values...)
+
+		if resp.IsLastPage || len(allResults) >= limit {
+			break
+		}
+
+		start = resp.NextPageStart
+	}
+
+	// Trim to limit if we exceeded it
+	if len(allResults) > limit {
+		allResults = allResults[:limit]
+	}
+
+	return allResults, nil
+}
+
+// ListPRs lists pull requests with optional filters.
+// If Role is set, uses dashboard endpoint (project/repo ignored).
+// Otherwise, uses repo-scoped endpoint (project and repo required).
+func (c *Client) ListPRs(ctx context.Context, opts ListPRsOptions) ([]PullRequest, error) {
+	if opts.State == "" {
+		opts.State = "OPEN"
+	}
+
+	query := url.Values{}
+	query.Set("state", opts.State)
+
+	var path string
+	if opts.Role != "" {
+		// Dashboard endpoint
+		path = "/rest/api/1.0/dashboard/pull-requests"
+		query.Set("role", opts.Role)
+	} else {
+		// Repo-scoped endpoint
+		if opts.Project == "" || opts.Repo == "" {
+			return nil, fmt.Errorf("project and repo required when role is not set")
+		}
+		path = fmt.Sprintf("/rest/api/1.0/projects/%s/repos/%s/pull-requests", opts.Project, opts.Repo)
+	}
+
+	return paginate[PullRequest](ctx, c, path, query, opts.Limit)
+}
+
+// GetPR gets details of a single pull request.
+func (c *Client) GetPR(ctx context.Context, project, repo string, prID int) (*PullRequest, error) {
+	path := fmt.Sprintf("/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d", project, repo, prID)
+	var pr PullRequest
+	if err := c.getJSON(ctx, path, nil, &pr); err != nil {
+		return nil, err
+	}
+	return &pr, nil
+}
+
+// GetPRDiff gets the full diff for a pull request as raw text.
+func (c *Client) GetPRDiff(ctx context.Context, project, repo string, prID int) (string, error) {
+	path := fmt.Sprintf("/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/diff", project, repo, prID)
+	data, err := c.getRaw(ctx, path, nil)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// GetPRCommits gets the list of commits in a pull request.
+func (c *Client) GetPRCommits(ctx context.Context, project, repo string, prID int, limit int) ([]Commit, error) {
+	path := fmt.Sprintf("/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/commits", project, repo, prID)
+	return paginate[Commit](ctx, c, path, nil, limit)
+}
+
+// GetBuildStatus gets the build statuses for a commit.
+func (c *Client) GetBuildStatus(ctx context.Context, commitID string, limit int) ([]BuildStatus, error) {
+	path := fmt.Sprintf("/rest/build-status/1.0/commits/%s", commitID)
+	return paginate[BuildStatus](ctx, c, path, nil, limit)
+}
+
+// Browse retrieves directory listing or file content for a path in a repository.
+// For directories, the response includes Children.
+// For files, the response includes Lines.
+// For binary files, Binary flag is set to true.
+func (c *Client) Browse(ctx context.Context, project, repo, path, ref string, _ string) (*BrowseResponse, error) {
+	// ref is optional; omit if empty
+	pathEscaped := url.PathEscape(path)
+	p := fmt.Sprintf("/rest/api/1.0/projects/%s/repos/%s/browse/%s", project, repo, pathEscaped)
+
+	query := url.Values{}
+	if ref != "" {
+		query.Set("at", ref)
+	}
+
+	var resp BrowseResponse
+	if err := c.getJSON(ctx, p, query, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// GetDiff returns the diff between two refs as a raw string.
+// Supports optional path parameter to filter to a single file.
+func (c *Client) GetDiff(ctx context.Context, project, repo, from, to, path string) (string, error) {
+	p := fmt.Sprintf("/rest/api/1.0/projects/%s/repos/%s/compare/diff", project, repo)
+
+	query := url.Values{}
+	query.Set("from", from)
+	query.Set("to", to)
+	if path != "" {
+		query.Set("path", path)
+	}
+
+	data, err := c.getRaw(ctx, p, query)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
 // getRaw fetches raw text (not JSON). Used for diff endpoints.
 // Sets Accept: text/plain to get raw unified diff from Bitbucket.
 // Truncates response at 1MB with a notice.
