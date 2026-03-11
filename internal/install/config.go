@@ -21,7 +21,7 @@ func ReadConfig(path string) (map[string]interface{}, error) {
 
 	var config map[string]interface{}
 	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("Error: %s contains invalid JSON: %v", path, err)
+		return nil, fmt.Errorf("cannot parse %s: %v", path, err)
 	}
 
 	return config, nil

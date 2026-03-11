@@ -20,7 +20,9 @@ func TestReadConfig_FileNotFound(t *testing.T) {
 func TestReadConfig_ValidJSON(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "config.json")
 	data := `{"mcpServers":{"other":{"command":"other"}}}`
-	os.WriteFile(tmpFile, []byte(data), 0644)
+	if err := os.WriteFile(tmpFile, []byte(data), 0644); err != nil {
+		t.Fatalf("test setup failed: %v", err)
+	}
 
 	config, err := ReadConfig(tmpFile)
 	if err != nil {
@@ -38,7 +40,9 @@ func TestReadConfig_ValidJSON(t *testing.T) {
 
 func TestReadConfig_InvalidJSON(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "config.json")
-	os.WriteFile(tmpFile, []byte("{invalid json}"), 0644)
+	if err := os.WriteFile(tmpFile, []byte("{invalid json}"), 0644); err != nil {
+		t.Fatalf("test setup failed: %v", err)
+	}
 
 	_, err := ReadConfig(tmpFile)
 	if err == nil {
@@ -104,9 +108,53 @@ func TestWriteConfig(t *testing.T) {
 	}
 
 	// Verify content is valid JSON
-	data, _ := os.ReadFile(tmpFile)
+	data, err := os.ReadFile(tmpFile)
+	if err != nil {
+		t.Fatalf("cannot read written config: %v", err)
+	}
 	var result map[string]interface{}
 	if err := json.Unmarshal(data, &result); err != nil {
 		t.Fatalf("invalid JSON written: %v", err)
+	}
+}
+
+func TestWriteConfig_BadPermissions(t *testing.T) {
+	// Try to write to a directory that doesn't have write permissions
+	tmpDir := t.TempDir()
+	roDir := filepath.Join(tmpDir, "readonly")
+	if err := os.Mkdir(roDir, 0555); err != nil {
+		t.Fatalf("test setup failed: %v", err)
+	}
+
+	configFile := filepath.Join(roDir, "config.json")
+	config := map[string]interface{}{"test": "data"}
+
+	err := WriteConfig(configFile, config)
+	if err == nil {
+		t.Fatal("expected error writing to read-only directory")
+	}
+}
+
+func TestMergeEntry_OverwriteNonMapServers(t *testing.T) {
+	// Test that mcpServers is overwritten if it's not a map
+	config := map[string]interface{}{
+		"mcpServers": "not-a-map",  // String instead of map
+	}
+
+	result := MergeEntry(config, "https://bitbucket.example.com", "token")
+
+	servers, ok := result["mcpServers"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected mcpServers to be overwritten as map")
+	}
+
+	bitbucket, ok := servers["bitbucket"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected bitbucket entry after merge")
+	}
+
+	env := bitbucket["env"].(map[string]interface{})
+	if env["BITBUCKET_TOKEN"] != "token" {
+		t.Fatalf("expected token to be set")
 	}
 }
