@@ -50,7 +50,7 @@ jobs:
         run: go build -o bitbucket-mcp-${{ matrix.os }}-${{ matrix.arch }} ./cmd/bitbucket-mcp/
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: bitbucket-mcp-${{ matrix.os }}-${{ matrix.arch }}
           path: bitbucket-mcp-${{ matrix.os }}-${{ matrix.arch }}
