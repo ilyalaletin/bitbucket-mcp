@@ -19,7 +19,7 @@ jobs:
       - name: Run tests
         run: go test ./... -v
 
-  build-and-release:
+  build:
     runs-on: ubuntu-latest
     needs: test
 
@@ -52,20 +52,31 @@ jobs:
           GOARCH: ${{ matrix.arch }}
         run: go build -o ${{ matrix.name }} ./cmd/bitbucket-mcp/
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        if: matrix.arch == 'amd64' && matrix.os == 'linux'
-        with:
-          files: |
-            bitbucket-mcp-linux-amd64
-            bitbucket-mcp-linux-arm64
-            bitbucket-mcp-darwin-amd64
-            bitbucket-mcp-darwin-arm64
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
           path: ${{ matrix.name }}
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/bitbucket-mcp-linux-amd64/bitbucket-mcp-linux-amd64
+            artifacts/bitbucket-mcp-linux-arm64/bitbucket-mcp-linux-arm64
+            artifacts/bitbucket-mcp-darwin-amd64/bitbucket-mcp-darwin-amd64
+            artifacts/bitbucket-mcp-darwin-arm64/bitbucket-mcp-darwin-arm64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
