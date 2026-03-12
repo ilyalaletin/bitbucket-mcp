@@ -10,6 +10,7 @@
 
 # Project binary (in root only)
 /bitbucket-mcp
+bitbucket-mcp-*
 
 # Test binary, built with `go test -c`
 *.test
