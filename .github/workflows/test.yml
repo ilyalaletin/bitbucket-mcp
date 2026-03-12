@@ -54,3 +54,4 @@ jobs:
         with:
           name: bitbucket-mcp-${{ matrix.os }}-${{ matrix.arch }}
           path: bitbucket-mcp-${{ matrix.os }}-${{ matrix.arch }}
+          retention-days: 1
